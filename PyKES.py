@@ -21,8 +21,8 @@ print("Started at " + strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()))
 #///////////// Motor Controller Port Settings //////////////
 
 stagePort = 'COM3'
-xStage = '01'
-zStage = '02'
+xStage = '02'
+zStage = '01'
 xFindHome = xStage + 'OR\r\n'
 zFindHome = zStage + 'OR\r\n'
 xStatus = xStage + 'TS\r\n'
@@ -36,36 +36,36 @@ zMax = 25 #mm
 zMin = 0 #mm
 #xBigStart = 9.16 #mm
 #xBigLimit = 9.23 #mm
-xMidStart = 1 #mm
-xMidLimit = 2 #mm
+xMidStart = 8.8#8.1 #mm
+xMidLimit = 9.2#8.25 #mm
 #xSmallStart = 9.79 #mm
 #xSmallLimit = 9.84 #mm
-xSmallStep = 0.1 #mm = 1um
+xSmallStep = 0.0005 #mm = 0.5um
 #xMidStep = 0.002 #mm = 2um
 #xBigStep = 0.003 #mm = 3um
-zStart = 1 #mm
-zLimit = 2 #mm
+zStart = 0.9#8.08 #mm
+zLimit = 0.4#8.38 #mm
 #zStep50 = 0.05 #mm = 50um
 #zStep10 = 0.01 #mm = 10um
 #zStep5 = 0.005 #mm = 5um
 #zStep3 = 0.003 #mm = 3um
 #zStep2 = 0.002 #mm = 2um
-zStep1 = 0.1 #mm = 1um
-xErr = 0.25 #um
-zErr = 0.25 #um
+zStep1 = -0.0005 #mm = 0.5um
+xErr = 0.00025 #mm = 0.25um
+zErr = 0.00025 #mm = 0.25um
 
 xResetStep = 0.5 #mm value to remove backlash on each x scan
-zResetStep = 0.5 #mm value to remove backlash on each z scan
+zResetStep = -0.5 #mm value to remove backlash on each z scan
 
-knifeEdgeBlockingPositionX = 5 #mm for background measurement
-knifeEdgeBlockingPositionZ = 5 #mm for background measurement
+knifeEdgeBlockingPositionX = 13 #mm for background measurement
+knifeEdgeBlockingPositionZ = 0.5 #mm for background measurement
 
-multipleReadingsCount = 5
+multipleReadingsCount = 3
 nDecimals = 6
 
 #///////////////// Save Directory /////////////////
 
-saveDirectory = "C:\\Users\\rbg94965\\Documents\\NewKES\\Test\\"
+saveDirectory = "C:\\Users\\rbg94965\\Documents\\NewKES\\Objective\\SmallRangeFine\\"
 
 #//////////////// Open and Initialise Powermeter ////////////////
 
@@ -120,7 +120,7 @@ def homeStage(axis):
 		stages.write(xFindHome.encode('utf-8'))
 		stages.flush()
 		time.sleep(1)
-		while str(stagesStatus) != "b'01TS000032\\r\\n'" and str(stagesStatus) != "b'01TS000033\\r\\n'":
+		while str(stagesStatus) != "b'02TS000032\\r\\n'" and str(stagesStatus) != "b'02TS000033\\r\\n'": #REMOVE HARDCODE
 			time.sleep(0.05)
 			stages.write(xStatus.encode('utf-8'))
 			stagesStatus = stages.readline()
@@ -130,7 +130,7 @@ def homeStage(axis):
 		stages.write(zFindHome.encode('utf-8'))
 		stages.flush()
 		time.sleep(1)
-		while str(stagesStatus) != "b'02TS000032\\r\\n'" and str(stagesStatus) != "b'02TS000033\\r\\n'":
+		while str(stagesStatus) != "b'01TS000032\\r\\n'" and str(stagesStatus) != "b'01TS000033\\r\\n'": #REMOVE HARDCODE
 			time.sleep(0.05)
 			stages.write(zStatus.encode('utf-8'))
 			stagesStatus = stages.readline()
@@ -148,7 +148,7 @@ def moveStage(axis,distance):
 		xMove = xStage + "PA" + str(distance) + "\r\n"
 		stages.write(xMove.encode('utf-8'))
 		stages.flush()
-		while str(stagesStatus) != "b'01TS000033\\r\\n'":
+		while str(stagesStatus) != "b'02TS000033\\r\\n'": #REMOVE HARDCODE
 			time.sleep(0.05)
 			stages.write(xStatus.encode('utf-8'))
 			stagesStatus = stages.readline()
@@ -157,7 +157,7 @@ def moveStage(axis,distance):
 		zMove = zStage + "PA" + str(distance) + "\r\n"
 		stages.write(zMove.encode('utf-8'))
 		stages.flush()
-		while str(stagesStatus) != "b'02TS000033\\r\\n'":
+		while str(stagesStatus) != "b'01TS000033\\r\\n'": #REMOVE HARDCODE
 			time.sleep(0.05)
 			stages.write(zStatus.encode('utf-8'))
 			stagesStatus = stages.readline()
@@ -218,14 +218,16 @@ moveStage('z',z)
 z = zStart
 
 print("Begin scan")
-
+startTime = time.time()
 # Initialise Longitudinal Results Arrays
 longitudinalPositions = []
 waistFits = []
 waistErrors = []
+fullScanData = []
 
 # Scan Longitudinal
-while z < (zLimit + zStep1):
+# while z < (zLimit + zStep1):
+while z >= (zLimit):
 	# move zStage
 	print("Moving z stage")
 	moveStage('z',z)
@@ -271,11 +273,11 @@ while z < (zLimit + zStep1):
 		print("Moving x stage")
 		moveStage('x',x)
 		transversePositions.append(x)
+		print("Measurements at x=" + str(x) + " and z=" + str(z))
 #///////////////// Take Measurements ///////////////#
 		averagePowerMeasurements = []
 		while currentCount < multipleReadingsCount:
             # Take Power Measurement
-			print("Measurement at x=" + str(x) + " and z=" + str(z))
 			power =  c_double()
 			tlPM.measPower(byref(power))
 			averagePowerMeasurements.append(power.value)
@@ -308,32 +310,33 @@ while z < (zLimit + zStep1):
 	transverseResultsSaveName = str(z) + '.txt'
 	np.savetxt(saveDirectory + transverseResultsSaveName, transverseResultsToSave)
 	# fit error function and find waist
-	p0 = np.array([-2.7e8,1e4,3e2,2e7])
+	p0 = np.array([-2.25e-3,9,1,1.1e-3])
 	try:
 		popt,pcov = curve_fit(KES,transverseResultsToSave[:,0],transverseResultsToSave[:,1],p0)
 		waist = popt[2]/math.sqrt(2)
 		perr = np.sqrt(np.diag(pcov))
 		waistErr = perr[2]/math.sqrt(2)
+		fullScanData.append([z,waist*waist,2*(waistErr*waist)])
 		waistFits.append(waist)
 		waistErrors.append(waistErr)
-		xData = np.linspace(xStart*1000,xLimit*1000,10000)
-		yData = KES(xData,popt[0],popt[1],popt[2],popt[3])
+		xData = np.linspace(xStart,xLimit,10000)
+		yData = KES(xData,*popt)
 		# create and save graph of results
-		plt.errorbar(transverseResultsToSave[:,0],transverseResultsToSave[:,1],transverseResultsToSave[:,2],xErr,markersize=5,label="Experimental Data",fmt='None')
+		plt.errorbar(transverseResultsToSave[:,0],transverseResultsToSave[:,1],transverseResultsToSave[:,2],xErr,uplims=True, label="Experimental Data")
 		plt.plot(xData,yData,"r",label="Theorectical Fit")
 	except:
 		print("Cannot find fit: excluding this result and moving on to next measurements")
 
-		plt.errorbar(transverseResultsToSave[:,0],transverseResultsToSave[:,1],transverseResultsToSave[:,2],xErr,markersize=5,label="Experimental Data",fmt='None')
+		plt.errorbar(transverseResultsToSave[:,0],transverseResultsToSave[:,1],transverseResultsToSave[:,2],xErr,uplims=True, label="Experimental Data")
 	graphTitle = u'Knife edge scan at ' + str(z) + ' mm'
-	xLabelKES = r'${Transverse\ Knife\ Edge\ Position\ ({\mu}m)}$'
+	xLabelKES = r'${Transverse\ Knife\ Edge\ Position\ (mm)}$'
 	yLabelKES = r'${Intensity}$'
 	saveFile = saveDirectory + str(z)+'.eps'
 	plt.title(graphTitle)
 	plt.xlabel(xLabelKES)
 	plt.ylabel(yLabelKES)
 	plt.legend(numpoints=1,loc=0)
-	plt.savefig(saveFile)
+	#plt.savefig(saveFile)
 	saveFile = saveDirectory + str(z)+'.png'
 	plt.savefig(saveFile)
 	plt.clf()
@@ -350,9 +353,51 @@ while z < (zLimit + zStep1):
 # Clean up connections
 tlPM.close()
 
-# Fit data
-
-# Plot results
-
-# # Cut from x loop
+print("Saving full scan results")
+resultsName = saveDirectory + 'FullScan.txt'
+saveFullResults = np.array(fullScanData)#np.loadtxt(resultsName)
+np.savetxt(resultsName,saveFullResults)
+# fit minimum curve and find results
+p0 = np.array([10e-3,1e-3,8.24])
+try:
+	popt,pcov = curve_fit(KESMin,saveFullResults[:,0],saveFullResults[:,1],p0)
+	waistMin = popt[0]
+	waistPos = popt[2]
+	waistFac = popt[1]
+	perr = np.sqrt(np.diag(pcov))
+	waistMinErr = perr[0]
+	waistPosErr = perr[2]
+	waistFacErr = perr[1]
+	# save final results
+	fitResults = []
+	fitResults.append([waistMin,waistMinErr])
+	fitResults.append([waistPos,waistPosErr])
+	fitResults.append([waistFac,waistFacErr])
+	saveFitResults = np.array(fitResults)
+	fitResultsName = saveDirectory + 'FullScanFitPara.txt'
+	np.savetxt(fitResultsName,saveFitResults)
+	# create and save final scan graph
+	xData = np.linspace(zStart,zLimit,10000)
+	yData = KESMin(xData,popt[0],popt[1],popt[2])
+	plt.errorbar(saveFullResults[:,0],saveFullResults[:,1],saveFullResults[:,2],zErr,uplims=True, label="Experimental Data")
+	plt.plot(xData,yData,"r",label="Theorectical Fit")
+except:
+	print("Cannot find fit: Saving data and graph for seperate analysis.")
+	plt.errorbar(saveFullResults[:,0],saveFullResults[:,1],saveFullResults[:,2],zErr,uplims=True, label="Experimental Data")
+graphTitle = u'Knife edge scan through Rayleigh range'
+xLabelKES = r'$Longitudinal\ Knife\ Edge\ Position\ (mm)$'#({\mu}m)$'
+yLabelKES = r'$Waist\ size\ squared\ (mm^2)$'#({\mu}m^2)$'
+saveFile = saveDirectory + 'FullScan.png'
+plt.ylim(min(yData)*0.5,max(yData)*1.1)
+plt.title(graphTitle)
+plt.xlabel(xLabelKES)
+plt.ylabel(yLabelKES)
+plt.legend(numpoints=1,loc=0)
+plt.savefig(saveFile)
+#------------------Clean Up--------------------#
+print("Scan finished at " + strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()))
 print('Scan complete. Data saved to: ' + saveDirectory)
+endTime = time.time()
+print("Time taken: " + str(endTime - startTime))
+plt.show()
+
